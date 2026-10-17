@@ -1,0 +1,56 @@
+/**
+ * PUB CampusMate — Timetable & Calendar Styling
+ */
+
+.timetable-grid {
+    display: grid;
+    grid-template-columns: 100px repeat(6, 1fr);
+    border: 1px solid var(--pub-border);
+    border-radius: var(--pub-radius-md);
+    background: #ffffff;
+    overflow-x: auto;
+}
+
+.timetable-header-cell {
+    background: #f8fafc;
+    font-weight: 700;
+    font-size: 0.85rem;
+    padding: 0.85rem 0.5rem;
+    text-align: center;
+    border-bottom: 1px solid var(--pub-border);
+    border-right: 1px solid var(--pub-border);
+    color: #475569;
+}
+
+.timetable-cell {
+    min-height: 90px;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--pub-border-subtle);
+    border-right: 1px solid var(--pub-border-subtle);
+    position: relative;
+}
+
+.timetable-slot {
+    background: #eff6ff;
+    border-left: 3px solid var(--pub-primary);
+    border-radius: 6px;
+    padding: 0.5rem;
+    font-size: 0.78rem;
+    transition: all 0.2s ease;
+}
+
+.timetable-slot:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    transform: translateY(-1px);
+}
+
+.timetable-slot.lab {
+    background: #f0fdfa;
+    border-left-color: var(--pub-secondary);
+}
+
+.timetable-slot-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--pub-text-muted);
+}

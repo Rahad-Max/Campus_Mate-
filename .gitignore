@@ -1,0 +1,31 @@
+# Composer
+/vendor/
+composer.lock
+
+# Environment file (contains secrets and local credentials)
+.env
+.env.backup
+.env.local
+
+# Storage and uploads
+/storage/logs/*.log
+/storage/cache/*
+/storage/documents/*
+!/storage/logs/.gitkeep
+!/storage/cache/.gitkeep
+!/storage/documents/.gitkeep
+
+# IDE and OS files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Test reports
+.phpunit.result.cache
+/coverage/

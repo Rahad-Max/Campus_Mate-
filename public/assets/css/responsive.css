@@ -1,0 +1,47 @@
+/**
+ * PUB CampusMate — Responsive Styles & Media Queries
+ */
+
+@media (max-width: 991.98px) {
+    .app-sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease-in-out;
+    }
+
+    .app-sidebar.show {
+        transform: translateX(0);
+        box-shadow: 0 0 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    .content-body {
+        padding: 1.25rem;
+    }
+
+    .app-navbar {
+        padding: 0 1.25rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .auth-card {
+        padding: 1.5rem;
+    }
+
+    .metric-card {
+        padding: 1rem;
+    }
+
+    .metric-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 1.3rem;
+    }
+
+    .metric-info .metric-value {
+        font-size: 1.4rem;
+    }
+}
