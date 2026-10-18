@@ -11,33 +11,35 @@ if (!function_exists('e')) {
     }
 }
 
-if (!function_exists('asset')) {
-    function asset(string $path): string
-    {
-        $base = rtrim($_ENV['APP_URL'] ?? '', '/');
-        $cleanPath = ltrim($path, '/');
-        if (empty($base)) {
-            return '/' . $cleanPath;
-        }
-        return $base . '/' . $cleanPath;
-    }
-}
-
 if (!function_exists('url')) {
     function url(string $path = ''): string
     {
         $base = rtrim($_ENV['APP_URL'] ?? '', '/');
+        if (empty($base) && isset($_SERVER['SCRIPT_NAME'])) {
+            $dir = dirname($_SERVER['SCRIPT_NAME']);
+            $base = ($dir === '/' || $dir === '\\') ? '' : rtrim(str_replace('\\', '/', $dir), '/');
+        }
         $cleanPath = ltrim($path, '/');
-        if (empty($path)) {
+        if (empty($cleanPath)) {
             return $base ?: '/';
         }
-        return ($base ?: '') . '/' . $cleanPath;
+        return ($base ? $base . '/' : '/') . $cleanPath;
+    }
+}
+
+if (!function_exists('asset')) {
+    function asset(string $path): string
+    {
+        return url($path);
     }
 }
 
 if (!function_exists('redirect')) {
     function redirect(string $url): void
     {
+        if (str_starts_with($url, '/') && !str_starts_with($url, '//')) {
+            $url = url($url);
+        }
         header("Location: {$url}");
         exit;
     }
@@ -46,9 +48,7 @@ if (!function_exists('redirect')) {
 if (!function_exists('flash')) {
     function flash(?string $type = null): ?string
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
 
         if ($type === null) {
             if (!empty($_SESSION['_flash'])) {
@@ -72,9 +72,7 @@ if (!function_exists('flash')) {
 if (!function_exists('has_flash')) {
     function has_flash(string $type): bool
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
         return !empty($_SESSION['_flash'][$type]);
     }
 }
@@ -82,9 +80,7 @@ if (!function_exists('has_flash')) {
 if (!function_exists('old')) {
     function old(string $key, mixed $default = ''): mixed
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
         $val = $_SESSION['_old'][$key] ?? $default;
         return $val;
     }

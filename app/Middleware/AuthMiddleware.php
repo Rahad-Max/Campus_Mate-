@@ -5,9 +5,7 @@ class AuthMiddleware
 {
     public function handle(?string $param = null): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
 
         if (empty($_SESSION['user']) || empty($_SESSION['user']['id'])) {
             if ($this->isAjaxRequest()) {

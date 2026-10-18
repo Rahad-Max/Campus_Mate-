@@ -129,7 +129,7 @@ http://localhost:8000
 
 ## 7. Verification & Diagnostic Commands
 
-Run the built-in diagnostic scripts to ensure your environment and database are functioning correctly:
+Run the built-in diagnostic scripts to ensure your environment, database, authentication, and security layers are functioning correctly:
 
 ```bash
 # 1. Verify PHP version, required extensions, and directory write permissions:
@@ -137,27 +137,144 @@ php scripts/check_environment.php
 
 # 2. Verify MySQL database connectivity, all 32 tables, and sample row counts:
 php scripts/verify_database.php
+
+# 3. Seed / Verify demonstration accounts (including inactive test user):
+php scripts/seed_demo_accounts.php
+
+# 4. Run the full automated test suite (25 Unit & Integration tests):
+php tests/run_tests.php
 ```
 
 ---
 
 ## 8. Seed Demonstration Accounts
 
-All demonstration accounts use the default password: **`Password@123`**
+All demonstration accounts use the default password: **`Password@123`**  
+*(Passwords are securely hashed using `password_hash()` with `PASSWORD_BCRYPT` cost 10).*
 
-| Role | Username | Email | Sample Name |
-| :--- | :--- | :--- | :--- |
-| **Student** | `student21` | `student@pub.ac.bd` | Rahat Rahman (ID: 210101001) |
-| **Student (Alt)** | `tamanna22` | `tamanna@pub.ac.bd` | Tamanna Akter (ID: 220101002) |
-| **Teacher** | `prof_tanvir` | `teacher@pub.ac.bd` | Engr. Tanvir Ahmed (T-CSE-001) |
-| **Academic Advisor** | `advisor_kazi` | `advisor@pub.ac.bd` | Dr. Kazi Nahid (T-CSE-002) |
-| **Coordinator** | `coord_hasan` | `coordinator@pub.ac.bd` | Dr. Mahmudul Hasan (T-CSE-003) |
+| Role | Username | Email | University ID | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Student** | `student21` | `student@pub.ac.bd` | 210101001 | Regular enrolled student, Batch 21 CSE |
+| **Student (Alt)** | `tamanna22` | `tamanna@pub.ac.bd` | 220101002 | Regular student, Batch 22 CSE |
+| **Teacher** | `prof_tanvir` | `teacher@pub.ac.bd` | T-CSE-001 | Assistant Professor, teaches algorithms & discrete math |
+| **Academic Advisor** | `advisor_kazi` | `advisor@pub.ac.bd` | T-CSE-002 | Associate Professor, oversees advisees & registration queue |
+| **Coordinator** | `coord_hasan` | `coordinator@pub.ac.bd` | T-CSE-003 | Department Head, curriculum & schedule management |
+| **Inactive Demo** | `inactive_demo` | `inactive@pub.ac.bd` | 200101099 | Suspended student account (verifies login rejection) |
 
-*(Tip: The sign-in page features 1-click quick-fill buttons for instant evaluation without manual typing).*
+*(Tip: The sign-in page features 1-click quick-fill buttons for all demo accounts including the inactive account test).*
 
 ---
 
-## 9. AI Helpdesk (RAG Foundation)
+## 9. Authentication & Security Highlights
+
+1. **Role-Based Routing & Access Control**:
+   - `/student/dashboard` (also `/dashboard/student`): Enforces `role:student`.
+   - `/teacher/dashboard` (also `/dashboard/teacher`): Enforces `role:teacher`.
+   - `/advisor/dashboard` (also `/dashboard/advisor`): Enforces `role:academic_advisor`.
+   - `/coordinator/dashboard` (also `/dashboard/coordinator`): Enforces `role:department_coordinator`.
+   - Base `/dashboard` automatically evaluates the authenticated session and redirects to the role-specific dashboard.
+   - Unauthorized attempts return an HTTP 403 Forbidden status and branded error view.
+2. **Session Security & CSRF Protection**:
+   - Session fixation prevention: Session ID is regenerated via `session_regenerate_id(true)` upon successful authentication.
+   - Secure cookie settings (`httponly`, `samesite=Lax`).
+   - CSRF tokens are injected on all state-changing POST forms (`login`, `logout`, `registration`, `approval`).
+3. **Information Disclosure Prevention**:
+   - Generic credentials error prevents user/email enumeration.
+   - Inactive/suspended accounts are blocked from accessing protected resources even with a valid password.
+   - Open-redirect protection validates the `intended_url` parameter, disallowing external and malformed URLs.
+4. **Audit Logging**:
+   - Authentication events (`auth.login`, `auth.logout`) are recorded in the `audit_logs` table without recording passwords or session tokens.
+
+---
+
+## 10. Academic Management Module (Phase 3)
+
+The Academic Management Module equips the Department Coordinator with comprehensive administration tools while offering role-tailored academic visibility for students, teachers, and advisors:
+
+### 1. Department Administration (`/coordinator/departments`)
+- Department catalog with active status filtering, building office location, and contact information.
+- Server-side validation of unique department codes (`CSE`, `EEE`, `BBA`).
+- Referential integrity guards preventing deactivation or orphan deletion when academic history exists.
+
+### 2. Semester & Term Planning (`/coordinator/semesters`)
+- Semester lifecycle management (`upcoming`, `registration_open`, `active`, `grading`, `closed`).
+- Strict date validation: term start/end date logic, registration window deadlines, and add/drop cutoffs.
+- Atomic transactional enforcement of a single official active semester across the institution.
+
+### 3. Degree Curricula & Matrix Roadmaps (`/coordinator/curricula`)
+- Program curriculum configuration (OBE syllabus versioning, target graduation credit hours).
+- Dynamic course matrix table with semester-by-semester recommended terms (Semester 1 to 8).
+- Real-time aggregation of matrix credit totals derived directly from associated course units.
+
+### 4. Course Catalog & Graph Prerequisite Validation (`/coordinator/courses`)
+- Master course registry with credit weights, course types (Theory, Lab, Project, Thesis), and syllabi.
+- Unique course code validation (`CSE-1101`, `CSE-2101`, etc.).
+- **Graph-based Cycle Detection**: Utilizes Breadth-First Search (BFS) graph traversal to detect and prevent circular prerequisite loops (e.g. A &rarr; B &rarr; C &rarr; A), as well as direct self-prerequisite assignment.
+
+### 5. Semester Course Offerings (`/coordinator/course-offerings`)
+- Schedule catalog courses for student registration in active academic terms.
+- Duplicate offering prevention per semester with status control (`offered`, `cancelled`, `completed`).
+
+### 6. Course Sections & Seat Capacities (`/coordinator/sections`)
+- Class section partitioning (`Sec A`, `Sec B`, etc.) with positive capacity limits.
+- Available seat computation (`capacity - enrolled_count`), preventing negative capacity.
+- Duplicate section code prevention within the same course offering.
+
+### 7. Classrooms & Lab Facilities (`/coordinator/rooms`)
+- Lecture gallery, computer lab, electronics lab, and seminar room facility management.
+- Capacity tracking, building/floor mapping, and maintenance status toggling.
+- Referential integrity guards: prevents room deletion if referenced by scheduled classes or exams.
+
+### 8. Teacher Assignments & Workload Limits (`/coordinator/teacher-assignments`)
+- Faculty allocation to course sections with Lead Teacher / Co-Instructor roles.
+- Workload capacity checking: computes semester credit hours against `max_credit_load` to prevent faculty burnout and policy violations.
+
+### 9. Role-Specific Read-Only Academic Views
+- **Student**: Browse active courses (`/student/courses`) and current term offerings with section seat availability (`/student/semester`).
+- **Teacher**: Inspect assigned syllabus outlines (`/teacher/courses`) and workload quota progress (`/teacher/assignments`).
+- **Advisor**: Review curriculum matrices and prerequisite requirements (`/advisor/courses`) to guide advisees during registration.
+
+---
+
+## 11. Smart Course Registration & Advisor Approval (Phase 4)
+
+Phase 4 delivers an end-to-end, transaction-safe course registration engine and an Academic Advisor approval suite:
+
+### 1. Student Course Registration Portal (`/student/registration`)
+- Real-time catalog search and dynamic filtering by course code, title, and seat availability.
+- Course cards showing credits, course type, assigned teacher, routine schedule, room number, and vacancies.
+- Live credit meter tracking selected credits against configured minimum (9.0 cr) and maximum limits (regular 18.0 cr, probation 12.0 cr).
+- Real-time client-side preview validation and server-side `/student/registration/validate` checking.
+- Submission modal preventing duplicate concurrent requests while a prior submission is under review (`RegistrationRequest::hasPendingRequest()`).
+
+### 2. Registration Request History & Tracking (`/student/registration/history`, `/student/registration/{id}`)
+- Batch history tracking with status badges (`submitted`, `advisor_approved`, `advisor_rejected`, `cancelled`).
+- Itemized request inspection displaying routine schedules, room numbers, instructor details, and advisor decision remarks.
+- Safe request cancellation modal allowing students to withdraw pending submissions prior to advisor action.
+
+### 3. Dedicated Server-Side Validation Engine (`RegistrationService.php`)
+- **Prerequisite Validation**: Cross-checks student's verified `student_course_history` for completed prerequisite courses with passing grades; provides explicit error messages identifying unsatisfied prerequisite courses.
+- **Credit Limit Policy**: Enforces institutional workload policies without hard-coding; dynamically respects academic probation thresholds.
+- **Seat Availability & Atomic Row Locking**: Immediate vacancies feedback in cart; performs row-level locking via `SELECT ... FOR UPDATE` (`Section::lockForUpdate()`) at approval time inside a database transaction to eliminate race conditions and overbooking.
+- **Duplicate Registration Prevention**: Blocks registering for multiple sections of the same course offering or duplicate submissions for the same academic semester.
+- **Timetable Conflict Detection**: Minute-accurate routine overlap detection between selected course sections and existing enrolled schedules on the same day.
+
+### 4. Academic Advisor Review & Approval Suite (`/advisor/registration-requests`)
+- Advisee request queue filtered strictly by authorized advisor mapping (`academic_advisors`).
+- Pre-audit review screen (`/advisor/registration-requests/{id}`) evaluating:
+  - Advisee profile: Department, Batch, CGPA, Academic Status (Regular/Probation).
+  - Pre-audit checks: Prerequisite completion status, credit workload compliance, schedule collisions, and section capacities.
+  - Complete historical transcript of previous semester grades.
+- **Atomic Approval**: Locks sections, reserves seats, increments `enrolled_count`, generates confirmed `registrations` records (`status = 'enrolled'`), and dispatches notifications inside a single database transaction.
+- **Rejection with Documented Reason**: Requires non-empty academic remarks and transitions status to `advisor_rejected`.
+- **Idempotency Guard**: Prevents already approved or rejected requests from being reprocessed.
+
+### 5. Transactional Notifications
+- Integrated with the notification system: sends alerts to students upon request submission, approval, and rejection; alerts advisors upon new advisee submissions.
+
+---
+
+## 12. AI Helpdesk (RAG Foundation)
 
 The AI Academic Helpdesk integrates Retrieval-Augmented Generation (RAG) principles:
 1. **Document Storage**: Uploaded academic ordinances are chunked into `document_chunks` with metadata (article number, page reference).
@@ -166,12 +283,76 @@ The AI Academic Helpdesk integrates Retrieval-Augmented Generation (RAG) princip
 
 ---
 
-## 10. Known Limitations & Next Steps
+## 13. Automated Test Suite
 
-This repository represents **Phase C1: Complete Architecture & Database Foundation**.
-- Core routing, controllers, services, models, database schemas, seed data, and role dashboards are established and verifiable.
-- Future phases will add:
-  - Automated dynamic schedule clash solvers.
-  - Multi-semester degree audit calculators.
-  - PDF generation for grade reports and registration receipts.
-  - Vector embedding ingestion pipelines via external vector databases.
+A standalone test runner verifies all foundation, authentication, academic management, registration, and timetable/exam scheduling features:
+```bash
+php tests/run_tests.php
+```
+
+Results: **65 Passed, 0 Failed (100% Pass Rate)**
+- **Foundation Tests (1-14)**: Database singleton, PDO, 32 tables, seeds, bcrypt, routing, XSS escaping, CSRF tokens, services, Helpdesk RAG search.
+- **Phase 2 Tests (1-12)**: Authentication, credential checks, inactive account blocks, session invalidation, role boundaries, CGPA calculation, open-redirect protection.
+- **Phase 3 Tests (1-12)**: Course creation, unique codes, self-prerequisite rejection, graph cycle detection, semester date validation, single active semester transactions, section capacity, duplicate section prevention, teacher workload enforcement, student/teacher access boundaries, and academic referential integrity.
+- **Phase 4 Tests (1-12)**: Eligible registration submission, prerequisite rejection with explicit errors, credit limit enforcement, full section capacity rejection, duplicate course in cart detection, timetable clash detection, student request isolation, advisor authorization, atomic approval & seat reservation, idempotent double-approval prevention, rejection with reason, and student cancellation.
+- **Phase 5 Tests (1-15)**: Timetable slot creation, teacher conflict rejection, classroom overlap rejection, section clash rejection, invalid time range validation, examination routine creation, room & invigilator clash checks, enrolled student exam clash checks, non-destructive make-up class creation linked to original routines, mandatory revision audit logging with documented reasons upon modifying published schedules, targeted notification dispatching to affected students and teachers, strict role boundary enforcement blocking student modifications, draft slot hiding from unauthorized students, complete preservation of academic management & Phase 4 enrollments, and full integration verification ensuring all four role dashboards render cleanly.
+
+---
+
+## 14. Phase 5: Smart Timetable & Examination Scheduling Features
+
+1. **Timetable Management**:
+   - Coordinator selects Semester, Course Offering, Section, assigned Teacher, and Classroom.
+   - Sets Day of Week, Start Time, End Time, and publication status (`draft`, `published`, `revised`, `cancelled`).
+   - Revision tracking: modifying a published routine prompts for a documented revision reason, which is committed to `schedule_revisions` and alerts affected users.
+2. **Automatic Conflict Engine (`TimetableConflictService`)**:
+   - Overlap formula: `new_start < existing_end AND new_end > existing_start`.
+   - Prevents Teacher Overlaps, Room Overlaps, Section Overlaps, and Student Enrollment Overlaps.
+3. **Examination Scheduling (`ExamController`, `Exam`)**:
+   - Supports midterm, final, quiz, and practical examinations.
+   - Detects room clashes, invigilator duty clashes, and student enrollment conflicts.
+4. **Non-Destructive Make-up Classes (`MakeupClassController`, `MakeupClass`)**:
+   - Links to original routine slot via `class_schedule_id` without overwriting historical records.
+   - Validates teacher, room, and student clashes.
+5. **Targeted In-App Notifications**:
+   - Dispatches notifications only to affected students (via section enrollments) and assigned teachers.
+6. **Visual UI Audit**:
+   - Documented in `artifacts/phase5/visual-audit.md` with 12 high-resolution screenshots in `artifacts/phase5/screenshots/`.
+
+---
+
+## 15. Demo Accounts & Verification Steps
+
+| Role | Username | Password | University ID | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Student** | `student21` | `Password@123` | 210101001 | Rahat Rahman (Batch 21, 3rd Sem) — View history, timetable & exams |
+| **Student (Alt)** | `tamanna22` | `Password@123` | 220101002 | Tamanna Akter (Batch 22, 2nd Sem) — Submit registration requests |
+| **Academic Advisor** | `advisor_kazi` | `Password@123` | T-CSE-002 | Dr. Kazi Nahid — Review advisee queues, approve/reject |
+| **Teacher** | `prof_tanvir` | `Password@123` | T-CSE-001 | Engr. Tanvir Ahmed — View assigned sections, teaching schedule & exam duties |
+| **Coordinator** | `coord_hasan` | `Password@123` | T-CSE-003 | Dr. Mahmudul Hasan — Manage timetables, exams, make-up classes & revisions |
+
+### Timetable & Examination Walkthrough:
+1. **Schedule a Class Routine**:
+   - Login as `coord_hasan` / `Password@123`.
+   - Navigate to `/coordinator/timetable`.
+   - Click **+ Schedule Class Routine** (`/coordinator/timetable/create`).
+   - Select Course Offering (e.g. `CSE-2101`), Section `A`, Faculty Member `Engr. Tanvir Ahmed`, Room `Room-301`, Day `Sunday`, Time `09:00 AM - 10:30 AM`.
+   - Click **Save Schedule Routine**.
+2. **Test Conflict Detection**:
+   - Attempt to schedule another routine for the same instructor or room at an overlapping time (e.g., `10:00 AM - 11:30 AM`).
+   - Observe immediate conflict rejection with specific clash details.
+3. **Revise a Published Routine**:
+   - Edit the routine, change the time or room, and provide a revision reason (e.g., *"Shifted for laboratory maintenance"*).
+   - View the revision recorded in `/coordinator/timetable/revisions`.
+4. **Student & Teacher Inspection**:
+   - Login as `student21` or `prof_tanvir`.
+   - Navigate to `/timetable` or `/exams` to view the published routines and targeted notifications.
+
+---
+
+## 16. Next Steps & Recommended Phase 6
+
+With **Phases 1, 2, 3, 4, and 5** complete and verified:
+- **Phase 6: FullCalendar & Interactive Visual Routine Matrix**: Drag-and-drop schedule adjustment with real-time collision warning modals.
+- **Phase 7: Examination Seat Plan Allotment & Hall Ticket Generation**: Intelligent student roll seating generator preventing adjacent peers from the same department/semester.
+- **Phase 8: AI Helpdesk Vector Embeddings Integration**: Seamless Gemini Embeddings ingestion replacing keyword fallback with semantic vector search.

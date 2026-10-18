@@ -15,9 +15,7 @@ class HelpdeskController extends Controller
 
     public function index(): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
 
         if (empty($_SESSION['helpdesk_session_id'])) {
             $_SESSION['helpdesk_session_id'] = 'sess_' . bin2hex(random_bytes(8));
@@ -44,9 +42,7 @@ class HelpdeskController extends Controller
 
     public function ask(): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
 
         $user = $this->authUser();
         $userId = $user['id'] ?? 1; // Default to demo user if testing

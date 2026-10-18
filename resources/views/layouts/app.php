@@ -15,10 +15,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.min.css">
 
     <!-- Application Theme Styles -->
-    <link rel="stylesheet" href="/assets/css/style.css">
-    <link rel="stylesheet" href="/assets/css/dashboard.css">
-    <link rel="stylesheet" href="/assets/css/timetable.css">
-    <link rel="stylesheet" href="/assets/css/responsive.css">
+    <link rel="stylesheet" href="<?= asset('assets/css/style.css') ?>">
+    <link rel="stylesheet" href="<?= asset('assets/css/dashboard.css') ?>">
+    <link rel="stylesheet" href="<?= asset('assets/css/timetable.css') ?>">
+    <link rel="stylesheet" href="<?= asset('assets/css/responsive.css') ?>">
 </head>
 <body>
     <div class="app-wrapper">
@@ -77,11 +77,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
     <!-- Application Scripts -->
-    <script src="/assets/js/app.js"></script>
-    <script src="/assets/js/dashboard.js"></script>
-    <script src="/assets/js/registration.js"></script>
-    <script src="/assets/js/timetable.js"></script>
-    <script src="/assets/js/notifications.js"></script>
-    <script src="/assets/js/helpdesk.js"></script>
+    <script src="<?= asset('assets/js/app.js') ?>"></script>
+    <script src="<?= asset('assets/js/dashboard.js') ?>"></script>
+    <script src="<?= asset('assets/js/registration.js') ?>"></script>
+    <script src="<?= asset('assets/js/timetable.js') ?>"></script>
+    <script src="<?= asset('assets/js/notifications.js') ?>"></script>
+    <script src="<?= asset('assets/js/helpdesk.js') ?>"></script>
 </body>
 </html>

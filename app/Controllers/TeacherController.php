@@ -43,4 +43,41 @@ class TeacherController extends Controller
             'semester' => $semester
         ]);
     }
+
+    public function courses(): void
+    {
+        $user = $this->authUser();
+        $teacherRecord = $this->teacherModel->findByUserId($user['id']);
+        $deptId = $teacherRecord ? (int)$teacherRecord['department_id'] : 1;
+
+        $courses = (new \App\Models\Course())->getAllWithDetails($deptId);
+        $curriculum = (new \App\Models\Curriculum())->getActiveForDepartment($deptId);
+        $curriculumCourses = $curriculum ? (new \App\Models\Curriculum())->getCurriculumCourses((int)$curriculum['id']) : [];
+
+        $this->render('teacher/courses', [
+            'title' => 'Department Courses & Syllabi — PUB CampusMate',
+            'courses' => $courses,
+            'curriculum' => $curriculum,
+            'curriculumCourses' => $curriculumCourses
+        ]);
+    }
+
+    public function assignments(): void
+    {
+        $user = $this->authUser();
+        $teacherRecord = $this->teacherModel->findByUserId($user['id']);
+        $semester = $this->semesterModel->getCurrent();
+        $semId = $semester['id'] ?? 2;
+
+        $assignments = $teacherRecord
+            ? (new \App\Models\TeacherAssignment())->getAssignmentsWithDetails($semId, (int)$teacherRecord['department_id'])
+            : [];
+
+        $this->render('teacher/assignments', [
+            'title' => 'Teaching Workload & Faculty Assignments — PUB CampusMate',
+            'assignments' => $assignments,
+            'semester' => $semester,
+            'teacher' => $teacherRecord
+        ]);
+    }
 }

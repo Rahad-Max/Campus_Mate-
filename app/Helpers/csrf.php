@@ -7,9 +7,7 @@
 if (!function_exists('csrf_token')) {
     function csrf_token(): string
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
 
         if (empty($_SESSION['_csrf_token'])) {
             $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
@@ -30,9 +28,7 @@ if (!function_exists('csrf_field')) {
 if (!function_exists('verify_csrf')) {
     function verify_csrf(?string $token): bool
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
 
         $sessionToken = $_SESSION['_csrf_token'] ?? '';
         return !empty($token) && !empty($sessionToken) && hash_equals($sessionToken, $token);

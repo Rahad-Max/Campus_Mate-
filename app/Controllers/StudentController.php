@@ -41,4 +41,38 @@ class StudentController extends Controller
             'history' => $history
         ]);
     }
+
+    public function courses(): void
+    {
+        $user = $this->authUser();
+        $studentRecord = $this->studentModel->findByUserId($user['id']);
+        $deptId = $studentRecord ? (int)$studentRecord['department_id'] : 1;
+
+        $courses = (new \App\Models\Course())->getAllWithDetails($deptId);
+        $curriculum = (new \App\Models\Curriculum())->getActiveForDepartment($deptId);
+        $curriculumCourses = $curriculum ? (new \App\Models\Curriculum())->getCurriculumCourses((int)$curriculum['id']) : [];
+
+        $departments = (new \App\Models\Department())->getActive();
+
+        $this->render('student/courses', [
+            'title' => 'My Academic Courses & Curriculum — PUB CampusMate',
+            'courses' => $courses,
+            'curriculum' => $curriculum,
+            'curriculumCourses' => $curriculumCourses,
+            'departments' => $departments,
+            'departmentId' => $deptId
+        ]);
+    }
+
+    public function semester(): void
+    {
+        $current = $this->semesterModel->getCurrent();
+        $semesters = $this->semesterModel->getAllOrdered();
+
+        $this->render('student/semester', [
+            'title' => 'Academic Calendar & Semester Info — PUB CampusMate',
+            'current' => $current,
+            'semesters' => $semesters
+        ]);
+    }
 }

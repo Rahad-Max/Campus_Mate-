@@ -5,9 +5,7 @@ class RoleMiddleware
 {
     public function handle(?string $requiredRoles = null): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
 
         if (empty($_SESSION['user'])) {
             header("Location: /login");
@@ -20,28 +18,32 @@ class RoleMiddleware
             $allowed = array_map('trim', explode(',', $requiredRoles));
 
             if (!in_array($userRole, $allowed, true)) {
+                http_response_code(403);
+
                 if ($this->isAjaxRequest()) {
-                    http_response_code(403);
                     header('Content-Type: application/json');
                     echo json_encode([
                         'success' => false,
+                        'code' => 403,
                         'message' => 'Access Denied: Insufficient role permissions for this resource.'
                     ]);
                     exit;
                 }
 
-                $_SESSION['_flash']['danger'] = "Access Denied: You do not have permission to access that section. (Current role: " . ucwords(str_replace('_', ' ', $userRole)) . ")";
-                
-                // Redirect user to their own valid dashboard
                 $dashboardRoute = match ($userRole) {
-                    'student' => '/dashboard/student',
-                    'teacher' => '/dashboard/teacher',
-                    'academic_advisor' => '/dashboard/advisor',
-                    'department_coordinator' => '/dashboard/coordinator',
-                    default => '/'
+                    'student' => '/student/dashboard',
+                    'teacher' => '/teacher/dashboard',
+                    'academic_advisor' => '/advisor/dashboard',
+                    'department_coordinator' => '/coordinator/dashboard',
+                    default => '/dashboard'
                 };
 
-                header("Location: {$dashboardRoute}");
+                \App\Core\View::render('errors/403', [
+                    'title' => '403 Forbidden — Access Denied',
+                    'userRole' => $userRole,
+                    'allowedRoles' => $allowed,
+                    'dashboardRoute' => $dashboardRoute
+                ], 'layouts/app');
                 exit;
             }
         }

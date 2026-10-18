@@ -21,15 +21,16 @@ abstract class Controller
 
     protected function redirect(string $url): void
     {
+        if (str_starts_with($url, '/') && !str_starts_with($url, '//')) {
+            $url = url($url);
+        }
         header("Location: {$url}");
         exit;
     }
 
     protected function setFlash(string $type, string $message): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        ensure_session_started();
         $_SESSION['_flash'][$type] = $message;
     }
 

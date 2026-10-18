@@ -58,18 +58,18 @@ if (file_exists(ROOT_PATH . '/vendor/autoload.php')) {
             require $file;
         }
     });
+}
 
-    // Load helper functions
-    $helpers = [
-        ROOT_PATH . '/app/Helpers/auth.php',
-        ROOT_PATH . '/app/Helpers/csrf.php',
-        ROOT_PATH . '/app/Helpers/validation.php',
-        ROOT_PATH . '/app/Helpers/response.php',
-    ];
-    foreach ($helpers as $helper) {
-        if (file_exists($helper)) {
-            require_once $helper;
-        }
+// Always ensure core helper functions are loaded
+$helpers = [
+    ROOT_PATH . '/app/Helpers/auth.php',
+    ROOT_PATH . '/app/Helpers/csrf.php',
+    ROOT_PATH . '/app/Helpers/validation.php',
+    ROOT_PATH . '/app/Helpers/response.php',
+];
+foreach ($helpers as $helper) {
+    if (file_exists($helper)) {
+        require_once $helper;
     }
 }
 
@@ -109,13 +109,7 @@ set_exception_handler(function (\Throwable $e) use ($isDebug) {
 // ---------------------------------------------------------------------
 // 4. Secure Session Initialization
 // ---------------------------------------------------------------------
-if (session_status() === PHP_SESSION_NONE) {
-    ini_set('session.cookie_httponly', '1');
-    ini_set('session.use_only_cookies', '1');
-    ini_set('session.cookie_samesite', 'Lax');
-    session_name($_ENV['SESSION_COOKIE_NAME'] ?? 'pub_campusmate_session');
-    session_start();
-}
+ensure_session_started();
 
 // ---------------------------------------------------------------------
 // 5. Initialize View Layer & Load Routes

@@ -14,6 +14,7 @@ class RegistrationService
     private CreditLimitService $creditLimitService;
     private SeatAvailabilityService $seatService;
     private TimetableConflictService $conflictService;
+    private NotificationService $notifService;
     private RegistrationRequest $requestModel;
     private Registration $regModel;
     private Section $sectionModel;
@@ -27,6 +28,7 @@ class RegistrationService
         $this->requestModel = new RegistrationRequest();
         $this->regModel = new Registration();
         $this->sectionModel = new Section();
+        $this->notifService = new NotificationService();
     }
 
     /**
@@ -37,6 +39,16 @@ class RegistrationService
         $errors = [];
         $totalCredits = 0.0;
         $courseIdsSeen = [];
+        $validatedSections = [];
+
+        if (empty($sectionIds)) {
+            return [
+                'valid' => false,
+                'errors' => ['Please select at least one course section to register.'],
+                'total_credits' => 0.0,
+                'sections' => []
+            ];
+        }
 
         foreach ($sectionIds as $secId) {
             $sec = $this->sectionModel->getDetailedInfo($secId);
@@ -49,6 +61,7 @@ class RegistrationService
             $courseCode = $sec['course_code'];
             $credit = (float)$sec['credit'];
             $totalCredits += $credit;
+            $validatedSections[] = $sec;
 
             // 1. Prevent duplicate course in cart
             if (in_array($courseId, $courseIdsSeen, true)) {
@@ -77,7 +90,11 @@ class RegistrationService
         // 5. Timetable conflict check within cart
         $conflictResult = $this->conflictService->detectInternalConflicts($sectionIds);
         if ($conflictResult['has_conflict']) {
-            $errors[] = "Timetable conflict detected between selected course schedules.";
+            $conflictMsgs = [];
+            foreach ($conflictResult['conflicts'] as $c) {
+                $conflictMsgs[] = "Clash on {$c['day']} between {$c['time_a']} and {$c['time_b']}";
+            }
+            $errors[] = "Timetable conflict detected: " . implode('; ', $conflictMsgs) . ".";
         }
 
         // 6. Timetable conflict against already enrolled courses
@@ -95,7 +112,8 @@ class RegistrationService
         return [
             'valid' => empty($errors),
             'errors' => $errors,
-            'total_credits' => $totalCredits
+            'total_credits' => $totalCredits,
+            'sections' => $validatedSections
         ];
     }
 
@@ -104,6 +122,11 @@ class RegistrationService
      */
     public function submitRequest(int $studentId, int $semesterId, array $sectionIds, string $notes = ''): int
     {
+        // Check for existing pending request
+        if ($this->requestModel->hasPendingRequest($studentId, $semesterId)) {
+            throw new AppException("You already have a pending registration request awaiting Academic Advisor review for this semester. You cannot submit multiple concurrent requests.");
+        }
+
         $validation = $this->validateCart($studentId, $semesterId, $sectionIds);
         if (!$validation['valid']) {
             throw new AppException(implode(' | ', $validation['errors']));
@@ -130,6 +153,33 @@ class RegistrationService
             }
 
             $db->commit();
+
+            // Notify Student
+            $student = (new \App\Models\Student())->getFullDetails($studentId);
+            if ($student && !empty($student['user_id'])) {
+                $this->notifService->notify(
+                    (int)$student['user_id'],
+                    'Registration Request Submitted',
+                    "Your registration request #{$requestId} ({$validation['total_credits']} credits) has been submitted for Academic Advisor review.",
+                    'registration',
+                    "/student/registration/{$requestId}"
+                );
+            }
+
+            // Notify Assigned Advisor if mapped
+            if ($student && !empty($student['advisor_teacher_id'])) {
+                $advTeacher = (new \App\Models\Teacher())->find((int)$student['advisor_teacher_id']);
+                if ($advTeacher && !empty($advTeacher['user_id'])) {
+                    $this->notifService->notify(
+                        (int)$advTeacher['user_id'],
+                        'New Registration Request Awaiting Review',
+                        "Advisee {$student['first_name']} {$student['last_name']} ({$student['student_id_card']}) submitted registration request #{$requestId} ({$validation['total_credits']} credits).",
+                        'registration',
+                        "/advisor/registration-requests/{$requestId}"
+                    );
+                }
+            }
+
             return $requestId;
         } catch (\Throwable $e) {
             $db->rollBack();
@@ -147,24 +197,47 @@ class RegistrationService
 
         try {
             $req = $this->requestModel->find($requestId);
-            if (!$req || $req['status'] !== 'submitted') {
-                throw new AppException("Request not in submittable status for approval.");
+            if (!$req) {
+                throw new AppException("Registration request #{$requestId} not found.");
+            }
+
+            if ($req['status'] !== 'submitted') {
+                throw new AppException("Request cannot be approved: current status is " . ucwords(str_replace('_', ' ', $req['status'])) . ".");
+            }
+
+            $studentId = (int)$req['student_id'];
+            $semesterId = (int)$req['semester_id'];
+
+            // Verify advisor authorization
+            if (!$this->requestModel->isStudentAssignedToAdvisor($studentId, $advisorTeacherId)) {
+                throw new AppException("Unauthorized: You are not the assigned Academic Advisor for this student.");
             }
 
             $items = $this->requestModel->getItems($requestId);
-            $studentId = (int)$req['student_id'];
-            $semesterId = (int)$req['semester_id'];
+            if (empty($items)) {
+                throw new AppException("Registration request has no course items.");
+            }
 
             foreach ($items as $item) {
                 $secId = (int)$item['section_id'];
 
-                // Atomic seat reservation
-                $seatAllocated = $this->sectionModel->incrementEnrolled($secId);
-                if (!$seatAllocated) {
-                    throw new AppException("Failed to approve: Section {$item['course_code']} has reached maximum capacity.");
+                // Atomic row lock & seat capacity verification
+                $lockedSec = $this->sectionModel->lockForUpdate($secId);
+                if (!$lockedSec) {
+                    throw new AppException("Section #{$secId} no longer exists.");
                 }
 
-                // Create confirmed registration
+                if ((int)$lockedSec['enrolled_count'] >= (int)$lockedSec['capacity']) {
+                    throw new AppException("Failed to approve: Section {$item['course_code']} (Section {$item['section_name']}) is full (Capacity: {$lockedSec['capacity']}).");
+                }
+
+                // Increment seat count atomically
+                $seatAllocated = $this->sectionModel->incrementEnrolled($secId);
+                if (!$seatAllocated) {
+                    throw new AppException("Failed to allocate seat in {$item['course_code']} (Section {$item['section_name']}).");
+                }
+
+                // Create confirmed registration record
                 $this->regModel->create([
                     'student_id' => $studentId,
                     'section_id' => $secId,
@@ -184,11 +257,137 @@ class RegistrationService
             $this->requestModel->update($requestId, [
                 'status' => 'advisor_approved',
                 'advisor_id' => $advisorTeacherId,
-                'advisor_remarks' => $remarks,
+                'advisor_remarks' => $remarks ?: 'Approved by Academic Advisor.',
                 'advisor_action_at' => date('Y-m-d H:i:s')
             ]);
 
             $db->commit();
+
+            // Notify student
+            $student = (new \App\Models\Student())->getFullDetails($studentId);
+            if ($student && !empty($student['user_id'])) {
+                $this->notifService->notify(
+                    (int)$student['user_id'],
+                    'Registration Request Approved!',
+                    "Your Summer 2026 course registration (Request #{$requestId}) has been approved by your Academic Advisor. Your courses are now officially enrolled.",
+                    'success',
+                    "/student/registration/{$requestId}"
+                );
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Advisor rejects request with documented reason.
+     */
+    public function rejectRequest(int $requestId, int $advisorTeacherId, string $rejectionReason): bool
+    {
+        $reason = trim($rejectionReason);
+        if (empty($reason)) {
+            throw new AppException("A specific rejection reason is required to reject a registration request.");
+        }
+
+        $db = Database::getInstance();
+        $db->beginTransaction();
+
+        try {
+            $req = $this->requestModel->find($requestId);
+            if (!$req) {
+                throw new AppException("Registration request #{$requestId} not found.");
+            }
+
+            if ($req['status'] !== 'submitted') {
+                throw new AppException("Request cannot be rejected: current status is " . ucwords(str_replace('_', ' ', $req['status'])) . ".");
+            }
+
+            $studentId = (int)$req['student_id'];
+
+            // Verify advisor authorization
+            if (!$this->requestModel->isStudentAssignedToAdvisor($studentId, $advisorTeacherId)) {
+                throw new AppException("Unauthorized: You are not the assigned Academic Advisor for this student.");
+            }
+
+            // Update request header
+            $this->requestModel->update($requestId, [
+                'status' => 'advisor_rejected',
+                'advisor_id' => $advisorTeacherId,
+                'advisor_remarks' => $reason,
+                'advisor_action_at' => date('Y-m-d H:i:s')
+            ]);
+
+            // Update all items to rejected with reason
+            $db->query(
+                "UPDATE `registration_request_items` SET `status` = 'rejected', `rejection_reason` = :reason WHERE `request_id` = :rid",
+                [':reason' => $reason, ':rid' => $requestId]
+            );
+
+            $db->commit();
+
+            // Notify student
+            $student = (new \App\Models\Student())->getFullDetails($studentId);
+            if ($student && !empty($student['user_id'])) {
+                $this->notifService->notify(
+                    (int)$student['user_id'],
+                    'Registration Request Rejected',
+                    "Your registration request #{$requestId} was rejected by your Academic Advisor. Reason: {$reason}",
+                    'danger',
+                    "/student/registration/{$requestId}"
+                );
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Student cancels a pending registration request.
+     */
+    public function cancelRequest(int $requestId, int $studentId, string $reason = ''): bool
+    {
+        $db = Database::getInstance();
+        $db->beginTransaction();
+
+        try {
+            $req = $this->requestModel->find($requestId);
+            if (!$req) {
+                throw new AppException("Registration request #{$requestId} not found.");
+            }
+
+            if ((int)$req['student_id'] !== $studentId) {
+                throw new AppException("Unauthorized: You do not own this registration request.");
+            }
+
+            if (!in_array($req['status'], ['submitted', 'draft'], true)) {
+                throw new AppException("Cannot cancel request: The request is already " . ucwords(str_replace('_', ' ', $req['status'])) . ".");
+            }
+
+            $this->requestModel->update($requestId, [
+                'status' => 'cancelled',
+                'submission_notes' => trim(($req['submission_notes'] ?? '') . "\n[Cancelled by Student]: " . ($reason ?: 'Cancelled by student before advisor review.'))
+            ]);
+
+            $db->commit();
+
+            // Notify student
+            $student = (new \App\Models\Student())->getFullDetails($studentId);
+            if ($student && !empty($student['user_id'])) {
+                $this->notifService->notify(
+                    (int)$student['user_id'],
+                    'Registration Request Cancelled',
+                    "Your registration request #{$requestId} has been cancelled successfully.",
+                    'warning',
+                    "/student/registration/{$requestId}"
+                );
+            }
+
             return true;
         } catch (\Throwable $e) {
             $db->rollBack();

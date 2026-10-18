@@ -5,6 +5,9 @@ if ($user) {
     $notifModel = new \App\Models\Notification();
     $unreadNotifCount = $notifModel->getUnreadCount((int)$user['id']);
 }
+$semModel = new \App\Models\Semester();
+$activeSem = $semModel->getCurrent();
+$activeSemName = $activeSem ? ($activeSem['name'] . ' Active') : 'Academic Session';
 ?>
 <nav class="app-navbar">
     <div class="d-flex align-items-center gap-3">
@@ -12,14 +15,14 @@ if ($user) {
             <i class="bi bi-list fs-5"></i>
         </button>
         <span class="badge bg-light text-primary border px-2 py-1 d-none d-md-inline-block">
-            <i class="bi bi-calendar3 me-1"></i> Summer 2026 Active
+            <i class="bi bi-calendar3 me-1"></i> <?= e($activeSemName) ?>
         </span>
     </div>
 
     <div class="d-flex align-items-center gap-3">
         <?php if ($user): ?>
             <!-- Notifications Icon -->
-            <a href="/notifications" class="btn btn-light rounded-circle position-relative border" title="Notifications">
+            <a href="<?= url('notifications') ?>" class="btn btn-light rounded-circle position-relative border" title="Notifications">
                 <i class="bi bi-bell"></i>
                 <?php if ($unreadNotifCount > 0): ?>
                     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
@@ -42,14 +45,14 @@ if ($user) {
                 <ul class="dropdown-menu dropdown-menu-end shadow-sm border">
                     <li><h6 class="dropdown-header"><?= e($user['email']) ?></h6></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="/dashboard"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
-                    <li><a class="dropdown-item" href="/helpdesk"><i class="bi bi-robot me-2"></i>AI Helpdesk</a></li>
+                    <li><a class="dropdown-item" href="<?= url('dashboard') ?>"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+                    <li><a class="dropdown-item" href="<?= url('helpdesk') ?>"><i class="bi bi-robot me-2"></i>AI Helpdesk</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</a></li>
+                    <li><a class="dropdown-item text-danger" href="<?= url('logout') ?>"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</a></li>
                 </ul>
             </div>
         <?php else: ?>
-            <a href="/login" class="btn btn-pub btn-sm px-3">Sign In</a>
+            <a href="<?= url('login') ?>" class="btn btn-pub btn-sm px-3">Sign In</a>
         <?php endif; ?>
     </div>
 </nav>

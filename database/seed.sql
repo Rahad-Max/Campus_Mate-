@@ -31,7 +31,8 @@ INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `role`, `first_
 (2, 'tamanna22', 'tamanna@pub.ac.bd', '$2y$10$mLOb2b5E/43ww.KwJOnhP.gkkPLMBEkkbw5p5zMobz/ziN41AWUjq', 'student', 'Tamanna', 'Akter', '+8801710000002', 'assets/images/student2.png', 1),
 (3, 'prof_tanvir', 'teacher@pub.ac.bd', '$2y$10$mLOb2b5E/43ww.KwJOnhP.gkkPLMBEkkbw5p5zMobz/ziN41AWUjq', 'teacher', 'Tanvir', 'Ahmed', '+8801720000001', 'assets/images/teacher.png', 1),
 (4, 'advisor_kazi', 'advisor@pub.ac.bd', '$2y$10$mLOb2b5E/43ww.KwJOnhP.gkkPLMBEkkbw5p5zMobz/ziN41AWUjq', 'academic_advisor', 'Dr. Kazi', 'Nahid', '+8801730000001', 'assets/images/advisor.png', 1),
-(5, 'coord_hasan', 'coordinator@pub.ac.bd', '$2y$10$mLOb2b5E/43ww.KwJOnhP.gkkPLMBEkkbw5p5zMobz/ziN41AWUjq', 'department_coordinator', 'Dr. Mahmudul', 'Hasan', '+8801740000001', 'assets/images/coordinator.png', 1);
+(5, 'coord_hasan', 'coordinator@pub.ac.bd', '$2y$10$mLOb2b5E/43ww.KwJOnhP.gkkPLMBEkkbw5p5zMobz/ziN41AWUjq', 'department_coordinator', 'Dr. Mahmudul', 'Hasan', '+8801740000001', 'assets/images/coordinator.png', 1),
+(6, 'inactive_demo', 'inactive@pub.ac.bd', '$2y$10$mLOb2b5E/43ww.KwJOnhP.gkkPLMBEkkbw5p5zMobz/ziN41AWUjq', 'student', 'Inactive', 'DemoAccount', '+8801710000099', 'assets/images/student.png', 0);
 
 -- ---------------------------------------------------------------------
 -- 4. Teachers
@@ -46,7 +47,8 @@ INSERT INTO `teachers` (`id`, `user_id`, `department_id`, `teacher_id_card`, `de
 -- ---------------------------------------------------------------------
 INSERT INTO `students` (`id`, `user_id`, `department_id`, `student_id_card`, `batch_no`, `admission_semester_id`, `current_semester_level`, `cgpa`, `completed_credits`, `academic_status`) VALUES
 (1, 1, 1, '210101001', 'Batch 21', 1, 3, 3.65, 36.00, 'regular'),
-(2, 2, 1, '220101002', 'Batch 22', 1, 2, 3.82, 19.50, 'regular');
+(2, 2, 1, '220101002', 'Batch 22', 1, 2, 3.82, 19.50, 'regular'),
+(3, 6, 1, '200101099', 'Batch 20', 1, 4, 2.10, 54.00, 'suspended');
 
 -- ---------------------------------------------------------------------
 -- 6. Academic Advisors Mapping

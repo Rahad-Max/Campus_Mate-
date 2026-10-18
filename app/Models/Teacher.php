@@ -65,4 +65,23 @@ class Teacher extends Model
                 ORDER BY s.student_id_card ASC";
         return $this->db->fetchAll($sql, [':tid' => $teacherId]);
     }
+
+    public function getAllWithDetails(?int $departmentId = null): array
+    {
+        $sql = "SELECT t.*, u.username, u.email, u.first_name, u.last_name, u.phone, u.avatar_url,
+                       d.code as department_code, d.name as department_name
+                FROM `teachers` t
+                JOIN `users` u ON u.id = t.user_id
+                JOIN `departments` d ON d.id = t.department_id
+                WHERE t.status = 'active'";
+
+        $params = [];
+        if ($departmentId) {
+            $sql .= " AND t.department_id = :did";
+            $params[':did'] = $departmentId;
+        }
+
+        $sql .= " ORDER BY d.code ASC, u.first_name ASC";
+        return $this->db->fetchAll($sql, $params);
+    }
 }

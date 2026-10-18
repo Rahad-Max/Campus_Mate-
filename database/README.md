@@ -45,3 +45,20 @@ mysql -u root -p pub_campusmate < database/schema.sql
 # 3. Import Seed Data
 mysql -u root -p pub_campusmate < database/seed.sql
 ```
+
+## Phase 4: Course Registration Policy & Seat Allocation Model
+
+### 1. Registration Request Lifecycle
+The course registration system implements a strict state-machine workflow across `registration_requests` and `registration_request_items`:
+- `draft`: Course sections selected in browser session; not yet officially filed.
+- `submitted`: Request formally submitted by the student and awaiting assigned Academic Advisor review. Active validation ensures only one pending request per student per semester (`RegistrationRequest::hasPendingRequest()`).
+- `advisor_approved`: Reviewed and approved by the assigned advisor. Seats are locked and consumed atomically, creating confirmed `registrations` records.
+- `advisor_rejected`: Rejected by the advisor with documented remarks. No seats consumed.
+- `cancelled`: Withdrawn by the student prior to advisor decision.
+
+### 2. Seat Reservation & Capacity Policy
+- **Timing of Seat Consumption**: Seats are evaluated during cart validation for immediate feedback, and reserved atomically at **approval time** inside a database transaction (`BEGIN TRANSACTION ... COMMIT`).
+- **Concurrency & Overbooking Prevention**: `SELECT ... FOR UPDATE` row-level locking on `sections` (`Section::lockForUpdate()`) ensures concurrent advisor approvals cannot overbook a section past its `capacity`.
+- **Atomic Counting**: `enrolled_count` is incremented upon approval (`Section::incrementEnrolled()`) and linked to confirmed `registrations` rows (`status = 'enrolled'`). Rejected and cancelled requests NEVER count toward enrolled seats.
+- **Referential Integrity**: A foreign key links `registrations.registration_request_id` to `registration_requests.id`. Partial registrations are rolled back automatically if any section is full or fails validation during the batch transaction.
+
